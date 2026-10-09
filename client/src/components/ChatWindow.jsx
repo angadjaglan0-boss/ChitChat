@@ -321,6 +321,8 @@ export default function ChatWindow() {
                       <button onClick={() => { setRevealedSecrets(p => ({...p, [msg.id]: true})); setTimeout(() => handleDeleteMessage(msg.id), 10000); }} className="font-bold flex items-center gap-2">💣 Tap to Reveal (10s)</button>
                     ) : isE2EEMsg && !isRevealed ? (
                       <button onClick={() => setRevealedSecrets(p => ({...p, [msg.id]: true}))} className="font-bold flex items-center gap-2 text-yellow-500">🔒 Tap to Decrypt</button>
+                    ) : msg.type === 'file' ? (
+                      <a href={cleanContent} download="Attachment" className="flex items-center font-medium gap-2 underline"><Paperclip size={16}/> Download File</a>
                     ) : msg.type === 'image' ? (
                       <motion.img initial={{opacity:0}} animate={{opacity:1}} src={cleanContent} className="rounded-lg max-w-full max-h-64 object-cover mb-1" />
                     ) : isReply ? (
@@ -394,6 +396,9 @@ export default function ChatWindow() {
               <EmojiPicker onEmojiClick={(e) => setInput(p => p + e.emoji)} theme="light" />
             </div>
           )}
+
+          <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+          <button onClick={() => fileInputRef.current?.click()} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full" title="Attach Media"><Paperclip size={20} /></button>
 
           <button onClick={() => setShowEmoji(!showEmoji)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Smile size={20} /></button>
           
