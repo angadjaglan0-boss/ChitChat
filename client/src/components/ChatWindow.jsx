@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone, Trash2, Globe, Mic, Bomb, Palette, Lock, Type, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone, Trash2, Globe, Mic, Bomb, Palette, Lock, Type, FileText, Pin, Reply, DollarSign, BarChart2 } from 'lucide-react';
 import CallModal from './CallModal';
 import useStore from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmojiPicker from 'emoji-picker-react';
 
 const API_URL = '/api';
-
-const APPLE_GIFS = [
-  'https://media.giphy.com/media/l41YkFIiBxQdRlKI8/giphy.gif',
-  'https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif',
-  'https://media.giphy.com/media/1n7cOcn3P1B2b4WjIH/giphy.gif',
-  'https://media.giphy.com/media/l0HlBwsIWjIgEQy52/giphy.gif',
-  'https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif',
-];
 
 const getSmartReplies = (msgs, user) => {
   const last = msgs[msgs.length-1];
@@ -38,7 +30,6 @@ export default function ChatWindow() {
   const { user, activeChat, messages = [], sendMessage } = useStore();
   const [input, setInput] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
-  const [showGifs, setShowGifs] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSecret, setIsSecret] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -50,11 +41,16 @@ export default function ChatWindow() {
   const [summary, setSummary] = useState(null);
   const [isDictating, setIsDictating] = useState(false);
   const [revealedSecrets, setRevealedSecrets] = useState({});
+  
+  // NEW FEATURES STATE
+  const [pinnedMsg, setPinnedMsg] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [theme, setTheme] = useState('bg-transparent');
+  const [showThemePicker, setShowThemePicker] = useState(false);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const emojiRef = useRef(null);
-  const gifRef = useRef(null);
   const typingTimeout = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -85,15 +81,6 @@ export default function ChatWindow() {
     s.on('typing', handleTyping);
     return () => { s.off('webrtc_signal', handleSignal); s.off('typing', handleTyping); };
   }, [activeChat]);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (emojiRef.current && !emojiRef.current.contains(e.target)) setShowEmoji(false);
-      if (gifRef.current && !gifRef.current.contains(e.target)) setShowGifs(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const handleDeleteMessage = async (msgId) => {
     try { await fetch(`${API_URL}/messages/${msgId}`, { method: 'DELETE' }); } 
@@ -129,15 +116,19 @@ export default function ChatWindow() {
     let finalInput = overrideInput || input;
     if (finalInput.trim()) {
       finalInput = finalInput.trim();
+      if (replyingTo) finalInput = `[Replying to: ${replyingTo.content.substring(0, 20)}...]\n${finalInput}`;
       if (isSecret) finalInput = `💣SECRET:${finalInput}`;
       if (isE2EE) finalInput = `🔒E2EE:${btoa(encodeURIComponent(finalInput))}`;
       sendMessage(finalInput);
       setInput('');
       setShowEmoji(false);
-      setShowGifs(false);
       setIsSecret(false);
+      setReplyingTo(null);
     }
   };
+
+  const sendPayment = () => { sendMessage("50.00", "payment"); };
+  const sendPoll = () => { sendMessage("Where should we eat today?|Pizza|Burgers", "poll"); };
 
   const startRecording = async () => {
     try {
@@ -217,18 +208,6 @@ export default function ChatWindow() {
     reader.readAsDataURL(file);
   };
 
-  const handleEmojiClick = (e) => setInput(p => p + e.emoji);
-  const handleSendGif = (url) => { sendMessage(url, 'image'); setShowGifs(false); };
-  const handleShareLocation = () => { 
-    if (navigator.geolocation) {
-      setIsUploading(true);
-      navigator.geolocation.getCurrentPosition((pos) => {
-        sendMessage(`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`, 'location');
-        setIsUploading(false);
-      }, () => setIsUploading(false));
-    }
-  };
-
   if (!activeChat) {
     return (
       <div className="hidden md:flex flex-col items-center justify-center flex-1 bg-transparent border-l border-white/20 overflow-hidden relative">
@@ -244,8 +223,8 @@ export default function ChatWindow() {
   const smartReplies = getSmartReplies(messages, user);
 
   return (
-    <div className="flex-1 flex flex-col bg-transparent relative overflow-hidden border-l border-white/30">
-      <motion.div initial={{ y: -50 }} animate={{ y: 0 }} className="h-16 bg-white/40 backdrop-blur-md flex items-center justify-between px-4 py-2 border-b border-white/40 z-20">
+    <div className={`flex-1 flex flex-col relative overflow-hidden border-l border-white/30 transition-colors duration-500 ${theme}`}>
+      <motion.div initial={{ y: -50 }} animate={{ y: 0 }} className="h-16 bg-white/60 backdrop-blur-md flex items-center justify-between px-4 py-2 border-b border-white/40 z-20">
         <div className="flex items-center gap-2 md:gap-4">
           <button className="md:hidden p-1 mr-1 rounded-full hover:bg-black/5" onClick={() => useStore.getState().setActiveChat(null)}>
             <ArrowLeft size={20} className="text-gray-700" />
@@ -256,11 +235,10 @@ export default function ChatWindow() {
             <p className="text-xs text-gray-600 font-medium">{activeChat.username === 'ChitChat AI' ? 'Always Online' : (activeChat.isGroup ? 'Group Chat' : (activeChat.status === 'online' ? 'online' : 'offline'))}</p>
           </div>
         </div>
-        <div className="flex items-center text-gray-700 gap-5">
+        <div className="flex items-center text-gray-700 gap-4">
+          <Palette className="cursor-pointer hover:text-pink-500" size={20} onClick={() => setShowThemePicker(!showThemePicker)} />
           {!activeChat.isGroup && activeChat.username !== 'ChitChat AI' && (
-            <motion.div whileHover={{ scale: 1.1, rotate: 10 }} whileTap={{ scale: 0.9 }}>
-               <Phone className="cursor-pointer hover:text-green-500" size={20} onClick={() => { setCallState('outgoing'); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'offer' }); }} />
-            </motion.div>
+            <Phone className="cursor-pointer hover:text-green-500" size={20} onClick={() => { setCallState('outgoing'); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'offer' }); }} />
           )}
           {activeChat.isGroup && <FileText className="cursor-pointer hover:text-purple-500" size={20} title="AI Summary" onClick={handleSummarize} />}
           <Search className="cursor-pointer hover:text-[#0a7aff]" size={20} />
@@ -268,12 +246,32 @@ export default function ChatWindow() {
         </div>
       </motion.div>
 
+      {/* Pinned Message Banner */}
+      {pinnedMsg && (
+        <div className="bg-white/80 backdrop-blur border-b border-gray-200 px-4 py-2 flex items-center justify-between z-10 text-sm">
+          <div className="flex items-center gap-2 text-gray-700"><Pin size={14} className="text-blue-500"/> <span className="font-medium truncate max-w-[200px]">Pinned: {pinnedMsg.content.substring(0,30)}</span></div>
+          <button onClick={() => setPinnedMsg(null)}><X size={16} className="text-gray-400 hover:text-red-500"/></button>
+        </div>
+      )}
+
+      {/* Theme Picker */}
+      {showThemePicker && (
+        <div className="absolute right-4 top-16 bg-white shadow-xl rounded-xl p-3 z-50 flex gap-2 border border-gray-100">
+           <button onClick={() => setTheme('bg-transparent')} className="w-8 h-8 rounded-full bg-gray-100 border border-gray-300"></button>
+           <button onClick={() => setTheme('bg-pink-50')} className="w-8 h-8 rounded-full bg-pink-200"></button>
+           <button onClick={() => setTheme('bg-blue-50')} className="w-8 h-8 rounded-full bg-blue-200"></button>
+           <button onClick={() => setTheme('bg-green-50')} className="w-8 h-8 rounded-full bg-green-200"></button>
+           <button onClick={() => setTheme('bg-yellow-50')} className="w-8 h-8 rounded-full bg-yellow-200"></button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-4 md:p-6 z-10 scrollbar-hide flex flex-col space-y-3">
         <AnimatePresence initial={false}>
           {messages.map((msg, idx) => {
             const isMe = msg.sender_id === user?.id;
             const isSecretMsg = msg.type === 'text' && msg.content.startsWith('💣SECRET:');
             const isE2EEMsg = msg.type === 'text' && msg.content.startsWith('🔒E2EE:');
+            const isReply = msg.type === 'text' && msg.content.startsWith('[Replying to:');
             const isRevealed = revealedSecrets[msg.id];
             
             let cleanContent = msg.content;
@@ -287,6 +285,8 @@ export default function ChatWindow() {
                 {isMe && (
                   <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                     <button onClick={() => handleTranslate(msg.id, cleanContent)} className="p-1 text-gray-400 hover:text-blue-500"><Globe size={16} /></button>
+                    <button onClick={() => setPinnedMsg(msg)} className="p-1 text-gray-400 hover:text-green-500"><Pin size={16} /></button>
+                    <button onClick={() => setReplyingTo(msg)} className="p-1 text-gray-400 hover:text-gray-700"><Reply size={16} /></button>
                     <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                   </div>
                 )}
@@ -296,12 +296,34 @@ export default function ChatWindow() {
                     
                     {msg.type === 'audio' ? (
                       <audio src={msg.content} controls className="h-8 max-w-[200px]" />
+                    ) : msg.type === 'payment' ? (
+                      <div className="bg-black text-white p-4 rounded-xl flex flex-col items-center min-w-[150px]">
+                         <DollarSign size={30} className="text-green-400 mb-1"/>
+                         <span className="font-bold text-xl">${msg.content}</span>
+                         <span className="text-xs text-gray-400 mb-3">Requested via Apple Cash</span>
+                         <button className="bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full w-full">Pay Now</button>
+                      </div>
+                    ) : msg.type === 'poll' ? (
+                      <div className="bg-white/10 p-3 rounded-xl min-w-[200px]">
+                         <h4 className="font-bold mb-2 flex items-center gap-2"><BarChart2 size={16}/> {msg.content.split('|')[0]}</h4>
+                         {msg.content.split('|').slice(1).map((opt, i) => (
+                            <div key={i} className="bg-black/10 rounded-lg p-2 mb-1 text-sm cursor-pointer hover:bg-black/20 flex justify-between">
+                              <span>{opt}</span>
+                              <span className="text-xs opacity-50">{Math.floor(Math.random()*10)} votes</span>
+                            </div>
+                         ))}
+                      </div>
                     ) : isSecretMsg && !isMe && !isRevealed ? (
                       <button onClick={() => { setRevealedSecrets(p => ({...p, [msg.id]: true})); setTimeout(() => handleDeleteMessage(msg.id), 10000); }} className="font-bold flex items-center gap-2">💣 Tap to Reveal (10s)</button>
                     ) : isE2EEMsg && !isRevealed ? (
-                      <button onClick={() => setRevealedSecrets(p => ({...p, [msg.id]: true}))} className="font-bold flex items-center gap-2 text-yellow-600">🔒 Tap to Decrypt</button>
+                      <button onClick={() => setRevealedSecrets(p => ({...p, [msg.id]: true}))} className="font-bold flex items-center gap-2 text-yellow-500">🔒 Tap to Decrypt</button>
                     ) : msg.type === 'image' ? (
                       <motion.img initial={{opacity:0}} animate={{opacity:1}} src={cleanContent} className="rounded-lg max-w-full max-h-64 object-cover mb-1" />
+                    ) : isReply ? (
+                      <div>
+                        <div className="bg-black/10 border-l-2 border-black/30 pl-2 py-1 mb-1 text-xs opacity-80 rounded-r-md">{cleanContent.split('\n')[0]}</div>
+                        <p className="break-words whitespace-pre-wrap">{cleanContent.split('\n').slice(1).join('\n')}</p>
+                      </div>
                     ) : (
                       <p className="break-words whitespace-pre-wrap">{cleanContent}</p>
                     )}
@@ -312,7 +334,11 @@ export default function ChatWindow() {
                   {sentiment && !isMe && <div className="absolute -bottom-2 -right-2 text-lg">{sentiment}</div>}
                 </div>
                 {!isMe && (
-                  <button onClick={() => handleTranslate(msg.id, cleanContent)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-500 transition-opacity"><Globe size={16} /></button>
+                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                    <button onClick={() => setReplyingTo(msg)} className="p-1 text-gray-400 hover:text-gray-700"><Reply size={16} /></button>
+                    <button onClick={() => setPinnedMsg(msg)} className="p-1 text-gray-400 hover:text-green-500"><Pin size={16} /></button>
+                    <button onClick={() => handleTranslate(msg.id, cleanContent)} className="p-1 text-gray-400 hover:text-blue-500"><Globe size={16} /></button>
+                  </div>
                 )}
               </motion.div>
             );
@@ -323,27 +349,13 @@ export default function ChatWindow() {
       </div>
 
       {smartReplies.length > 0 && !isTyping && (
-        <div className="flex gap-2 px-4 py-2 z-20 justify-end overflow-x-auto scrollbar-hide absolute bottom-16 w-full">
+        <div className="flex gap-2 px-4 py-2 z-20 justify-end overflow-x-auto scrollbar-hide absolute bottom-[80px] w-full">
           {smartReplies.map((reply, i) => (
              <button key={i} onClick={() => handleSend(null, reply)} className="bg-white/80 backdrop-blur shadow-sm border border-gray-200 text-[#0a7aff] px-4 py-1.5 rounded-full text-sm font-medium hover:bg-[#0a7aff] hover:text-white transition-colors whitespace-nowrap">{reply}</button>
           ))}
         </div>
       )}
 
-      {/* Summary Modal */}
-      {summary && (
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4">
-          <div className="bg-white shadow-2xl rounded-2xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-gray-800 text-lg flex items-center gap-2"><FileText size={20}/> AI Summary</h3>
-              <button onClick={() => setSummary(null)}><X size={20} className="text-gray-500 hover:text-red-500"/></button>
-            </div>
-            <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">{summary}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Shared Canvas Modal */}
       {showCanvas && (
         <div className="absolute inset-0 bg-white/90 backdrop-blur-md z-50 flex flex-col items-center justify-center">
           <div className="bg-white shadow-2xl rounded-2xl p-4">
@@ -357,27 +369,37 @@ export default function ChatWindow() {
         </div>
       )}
 
-      <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white/40 backdrop-blur-md flex items-center px-4 py-3 z-20 relative border-t border-white/40">
-        <button onClick={() => setShowCanvas(true)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Palette size={22} /></button>
-        <button onClick={() => setIsE2EE(!isE2EE)} className={`p-2 rounded-full transition-colors ${isE2EE ? 'bg-green-100 text-green-600' : 'text-gray-500 hover:text-green-600'}`} title="End-to-End Encryption"><Lock size={22} /></button>
-        <button onClick={() => setIsSecret(!isSecret)} className={`p-2 rounded-full transition-colors ${isSecret ? 'bg-red-100 text-red-500' : 'text-gray-500 hover:text-red-500'}`}><Bomb size={22} /></button>
-        <button onClick={() => { setShowEmoji(!showEmoji); setShowGifs(false); }} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Smile size={24} /></button>
+      <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white/60 backdrop-blur-md flex flex-col px-4 py-3 z-20 relative border-t border-white/40">
         
-        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-        <button onClick={() => fileInputRef.current?.click()} className="text-gray-500 hover:text-[#0a7aff] p-2 mx-1 rounded-full"><Paperclip size={22} /></button>
-        
-        <form onSubmit={(e) => handleSend(e, null)} className="flex-1 flex px-2 relative">
-          <input type="text" value={input} onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }} placeholder={isSecret ? "Type a secret message..." : isE2EE ? "Type encrypted message..." : "iMessage"} className={`w-full rounded-full px-5 py-2 focus:outline-none text-sm text-gray-900 shadow-sm border ${isSecret ? 'bg-red-50 border-red-300 placeholder-red-400' : 'bg-white/80 border-gray-300 focus:border-[#0a7aff]'}`} />
-        </form>
-
-        {input.trim() ? (
-          <button onClick={(e) => handleSend(e, null)} className={`p-2 rounded-full shadow-md ml-1 text-white ${isSecret ? 'bg-red-500 hover:bg-red-600' : 'bg-[#0a7aff] hover:bg-blue-600'}`}><Send size={18} className="ml-0.5" /></button>
-        ) : (
-          <div className="flex">
-            <button onClick={handleDictate} className={`p-2 rounded-full shadow-md ml-1 text-white ${isDictating ? 'bg-purple-500 animate-pulse' : 'bg-purple-400 hover:bg-purple-500'}`} title="Dictate to text"><Type size={18} /></button>
-            <button onMouseDown={startRecording} onMouseUp={stopRecording} onTouchStart={startRecording} onTouchEnd={stopRecording} className={`p-2 rounded-full shadow-md ml-1 text-white ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-[#34c759] hover:bg-green-600'}`}><Mic size={18} /></button>
+        {/* Reply Banner */}
+        {replyingTo && (
+          <div className="flex items-center justify-between bg-black/5 rounded-lg px-3 py-1.5 mb-2 border-l-4 border-[#0a7aff]">
+             <div className="text-xs text-gray-600 truncate max-w-[80%]"><span className="font-bold">Replying to:</span> {replyingTo.content}</div>
+             <button onClick={() => setReplyingTo(null)}><X size={14} className="text-gray-400 hover:text-red-500"/></button>
           </div>
         )}
+
+        <div className="flex items-center">
+          <button onClick={() => setShowCanvas(true)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Palette size={20} /></button>
+          <button onClick={sendPoll} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full" title="Send Poll"><BarChart2 size={20} /></button>
+          <button onClick={sendPayment} className="text-gray-500 hover:text-green-500 p-2 rounded-full" title="Request Money"><DollarSign size={20} /></button>
+          <button onClick={() => setIsE2EE(!isE2EE)} className={`p-2 rounded-full transition-colors ${isE2EE ? 'bg-green-100 text-green-600' : 'text-gray-500 hover:text-green-600'}`} title="End-to-End Encryption"><Lock size={20} /></button>
+          <button onClick={() => setIsSecret(!isSecret)} className={`p-2 rounded-full transition-colors ${isSecret ? 'bg-red-100 text-red-500' : 'text-gray-500 hover:text-red-500'}`}><Bomb size={20} /></button>
+          <button onClick={() => setShowEmoji(!showEmoji)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Smile size={20} /></button>
+          
+          <form onSubmit={(e) => handleSend(e, null)} className="flex-1 flex px-2 relative">
+            <input type="text" value={input} onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }} placeholder={isSecret ? "Type a secret message..." : isE2EE ? "Type encrypted message..." : "iMessage"} className={`w-full rounded-full px-4 py-2 focus:outline-none text-sm text-gray-900 shadow-sm border ${isSecret ? 'bg-red-50 border-red-300 placeholder-red-400' : 'bg-white/80 border-gray-300 focus:border-[#0a7aff]'}`} />
+          </form>
+
+          {input.trim() ? (
+            <button onClick={(e) => handleSend(e, null)} className={`p-2 rounded-full shadow-md ml-1 text-white ${isSecret ? 'bg-red-500 hover:bg-red-600' : 'bg-[#0a7aff] hover:bg-blue-600'}`}><Send size={18} className="ml-0.5" /></button>
+          ) : (
+            <div className="flex">
+              <button onClick={handleDictate} className={`p-2 rounded-full shadow-md ml-1 text-white ${isDictating ? 'bg-purple-500 animate-pulse' : 'bg-purple-400 hover:bg-purple-500'}`} title="Dictate to text"><Type size={18} /></button>
+              <button onMouseDown={startRecording} onMouseUp={stopRecording} onTouchStart={startRecording} onTouchEnd={stopRecording} className={`p-2 rounded-full shadow-md ml-1 text-white ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-[#34c759] hover:bg-green-600'}`}><Mic size={18} /></button>
+            </div>
+          )}
+        </div>
       </motion.div>
       <AnimatePresence>
         {callState && <CallModal caller={activeChat} isIncoming={callState === 'incoming'} onAccept={() => { setCallState('active'); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'answer' }); }} onDecline={() => { setCallState(null); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'end' }); }} onEnd={() => { setCallState(null); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'end' }); }} />}
