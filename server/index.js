@@ -5,7 +5,6 @@ import cors from 'cors';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { get, run, query } from './db/database.js';
@@ -288,4 +287,12 @@ io.on('connection', (socket) => {
       io.to(receiverSocket).emit('webrtc_signal', { ...data, from: socket.userId });
     }
   });
+});
+
+// Serve Frontend in Production
+const clientBuildPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientBuildPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
