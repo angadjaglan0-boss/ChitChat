@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone } from 'lucide-react';
 import CallModal from './CallModal';
 import useStore from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -159,7 +159,10 @@ export default function ChatWindow() {
         initial={{ y: -50 }} animate={{ y: 0 }}
         className="h-16 bg-white/40 backdrop-blur-md flex items-center justify-between px-4 py-2 border-b border-white/40 z-20"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button className="md:hidden p-1 mr-1 rounded-full hover:bg-black/5" onClick={() => useStore.getState().setActiveChat(null)}>
+            <ArrowLeft size={20} className="text-gray-700" />
+          </button>
           <motion.img 
             layoutId={`avatar-${activeChat.id}`}
             src={activeChat.avatar} alt="avatar" className="w-10 h-10 rounded-full shadow-sm bg-white/80" 

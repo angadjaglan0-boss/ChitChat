@@ -14,7 +14,7 @@ export default function Sidebar() {
   );
 
   return (
-    <div className="w-full md:w-1/3 h-full border-r border-gray-200 flex flex-col bg-transparent flex-shrink-0 z-20">
+    <div className={`w-full md:w-1/3 h-full border-r border-gray-200 bg-transparent flex-shrink-0 z-20 ${activeChat ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
       {/* Header */}
       <div className="h-16 bg-white/50 backdrop-blur-md flex items-center justify-between px-4 py-2 border-b">
         <motion.div 

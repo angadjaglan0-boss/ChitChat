@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 
 export default function Chat() {
   return (
-    <div className="h-screen w-full p-0 md:p-4 flex items-center justify-center relative overflow-hidden bg-black">
+    <div className="h-[100dvh] w-full p-0 md:p-4 flex items-center justify-center relative overflow-hidden bg-black">
       {/* iOS-style animated blurred background gradient */}
       <motion.div 
         animate={{ 
