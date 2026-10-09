@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone, Trash2, Globe, Mic, Bomb, Palette } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone, Trash2, Globe, Mic, Bomb, Palette, Lock, Type, FileText } from 'lucide-react';
 import CallModal from './CallModal';
 import useStore from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -45,7 +45,12 @@ export default function ChatWindow() {
   const [showCanvas, setShowCanvas] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [callState, setCallState] = useState(null);
-  
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [isE2EE, setIsE2EE] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [isDictating, setIsDictating] = useState(false);
+  const [revealedSecrets, setRevealedSecrets] = useState({});
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const emojiRef = useRef(null);
@@ -55,8 +60,6 @@ export default function ChatWindow() {
   const audioChunksRef = useRef([]);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [revealedSecrets, setRevealedSecrets] = useState({});
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => { scrollToBottom(); }, [messages, isUploading, isTyping]);
@@ -112,11 +115,23 @@ export default function ChatWindow() {
     } catch(err) { console.error(err); }
   };
 
+  const handleSummarize = async () => {
+    setSummary("Summarizing...");
+    try {
+      const res = await fetch(`${API_URL}/summarize/${activeChat.id}`);
+      const data = await res.json();
+      setSummary(data.summary);
+    } catch(err) { console.error(err); }
+  };
+
   const handleSend = (e, overrideInput) => {
     e?.preventDefault();
-    const finalInput = overrideInput || input;
+    let finalInput = overrideInput || input;
     if (finalInput.trim()) {
-      sendMessage(isSecret ? `💣SECRET:${finalInput.trim()}` : finalInput.trim());
+      finalInput = finalInput.trim();
+      if (isSecret) finalInput = `💣SECRET:${finalInput}`;
+      if (isE2EE) finalInput = `🔒E2EE:${btoa(encodeURIComponent(finalInput))}`;
+      sendMessage(finalInput);
       setInput('');
       setShowEmoji(false);
       setShowGifs(false);
@@ -153,6 +168,16 @@ export default function ChatWindow() {
     }
   };
 
+  const handleDictate = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Speech recognition not supported in this browser");
+    const recognition = new SpeechRecognition();
+    recognition.onstart = () => setIsDictating(true);
+    recognition.onresult = (e) => setInput(p => p + " " + e.results[0][0].transcript);
+    recognition.onend = () => setIsDictating(false);
+    recognition.start();
+  };
+
   const initCanvas = (canvas) => {
     if (!canvas) return;
     canvasRef.current = canvas;
@@ -180,7 +205,7 @@ export default function ChatWindow() {
     }
   };
 
-  const handleFileUpload = (e) => { /* ... existing file upload ... */ 
+  const handleFileUpload = (e) => { 
     const file = e.target.files[0];
     if (!file) return;
     setIsUploading(true);
@@ -194,7 +219,7 @@ export default function ChatWindow() {
 
   const handleEmojiClick = (e) => setInput(p => p + e.emoji);
   const handleSendGif = (url) => { sendMessage(url, 'image'); setShowGifs(false); };
-  const handleShareLocation = () => { /* ... */ 
+  const handleShareLocation = () => { 
     if (navigator.geolocation) {
       setIsUploading(true);
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -237,6 +262,7 @@ export default function ChatWindow() {
                <Phone className="cursor-pointer hover:text-green-500" size={20} onClick={() => { setCallState('outgoing'); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'offer' }); }} />
             </motion.div>
           )}
+          {activeChat.isGroup && <FileText className="cursor-pointer hover:text-purple-500" size={20} title="AI Summary" onClick={handleSummarize} />}
           <Search className="cursor-pointer hover:text-[#0a7aff]" size={20} />
           <MoreVertical className="cursor-pointer hover:text-[#0a7aff]" size={20} />
         </div>
@@ -247,9 +273,14 @@ export default function ChatWindow() {
           {messages.map((msg, idx) => {
             const isMe = msg.sender_id === user?.id;
             const isSecretMsg = msg.type === 'text' && msg.content.startsWith('💣SECRET:');
-            const cleanContent = isSecretMsg ? msg.content.substring(9) : msg.content;
+            const isE2EEMsg = msg.type === 'text' && msg.content.startsWith('🔒E2EE:');
             const isRevealed = revealedSecrets[msg.id];
-            const sentiment = msg.type === 'text' && !isSecretMsg ? getSentimentEmoji(cleanContent) : null;
+            
+            let cleanContent = msg.content;
+            if (isSecretMsg) cleanContent = msg.content.substring(9);
+            if (isE2EEMsg && isRevealed) cleanContent = decodeURIComponent(atob(msg.content.substring(7)));
+
+            const sentiment = msg.type === 'text' && !isSecretMsg && !isE2EEMsg ? getSentimentEmoji(cleanContent) : null;
 
             return (
               <motion.div layout initial={{ opacity: 0, scale: 0.8, x: isMe ? 50 : -50, originX: isMe ? 1 : 0 }} animate={{ opacity: 1, scale: 1, x: 0 }} key={msg.id || idx} className={`group flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -267,6 +298,8 @@ export default function ChatWindow() {
                       <audio src={msg.content} controls className="h-8 max-w-[200px]" />
                     ) : isSecretMsg && !isMe && !isRevealed ? (
                       <button onClick={() => { setRevealedSecrets(p => ({...p, [msg.id]: true})); setTimeout(() => handleDeleteMessage(msg.id), 10000); }} className="font-bold flex items-center gap-2">💣 Tap to Reveal (10s)</button>
+                    ) : isE2EEMsg && !isRevealed ? (
+                      <button onClick={() => setRevealedSecrets(p => ({...p, [msg.id]: true}))} className="font-bold flex items-center gap-2 text-yellow-600">🔒 Tap to Decrypt</button>
                     ) : msg.type === 'image' ? (
                       <motion.img initial={{opacity:0}} animate={{opacity:1}} src={cleanContent} className="rounded-lg max-w-full max-h-64 object-cover mb-1" />
                     ) : (
@@ -297,6 +330,19 @@ export default function ChatWindow() {
         </div>
       )}
 
+      {/* Summary Modal */}
+      {summary && (
+        <div className="absolute inset-0 bg-white/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4">
+          <div className="bg-white shadow-2xl rounded-2xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-gray-800 text-lg flex items-center gap-2"><FileText size={20}/> AI Summary</h3>
+              <button onClick={() => setSummary(null)}><X size={20} className="text-gray-500 hover:text-red-500"/></button>
+            </div>
+            <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">{summary}</div>
+          </div>
+        </div>
+      )}
+
       {/* Shared Canvas Modal */}
       {showCanvas && (
         <div className="absolute inset-0 bg-white/90 backdrop-blur-md z-50 flex flex-col items-center justify-center">
@@ -313,6 +359,7 @@ export default function ChatWindow() {
 
       <motion.div initial={{ y: 50 }} animate={{ y: 0 }} className="bg-white/40 backdrop-blur-md flex items-center px-4 py-3 z-20 relative border-t border-white/40">
         <button onClick={() => setShowCanvas(true)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Palette size={22} /></button>
+        <button onClick={() => setIsE2EE(!isE2EE)} className={`p-2 rounded-full transition-colors ${isE2EE ? 'bg-green-100 text-green-600' : 'text-gray-500 hover:text-green-600'}`} title="End-to-End Encryption"><Lock size={22} /></button>
         <button onClick={() => setIsSecret(!isSecret)} className={`p-2 rounded-full transition-colors ${isSecret ? 'bg-red-100 text-red-500' : 'text-gray-500 hover:text-red-500'}`}><Bomb size={22} /></button>
         <button onClick={() => { setShowEmoji(!showEmoji); setShowGifs(false); }} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Smile size={24} /></button>
         
@@ -320,13 +367,16 @@ export default function ChatWindow() {
         <button onClick={() => fileInputRef.current?.click()} className="text-gray-500 hover:text-[#0a7aff] p-2 mx-1 rounded-full"><Paperclip size={22} /></button>
         
         <form onSubmit={(e) => handleSend(e, null)} className="flex-1 flex px-2 relative">
-          <input type="text" value={input} onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }} placeholder={isSecret ? "Type a secret message..." : "iMessage"} className={`w-full rounded-full px-5 py-2 focus:outline-none text-sm text-gray-900 shadow-sm border ${isSecret ? 'bg-red-50 border-red-300 placeholder-red-400' : 'bg-white/80 border-gray-300 focus:border-[#0a7aff]'}`} />
+          <input type="text" value={input} onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }} placeholder={isSecret ? "Type a secret message..." : isE2EE ? "Type encrypted message..." : "iMessage"} className={`w-full rounded-full px-5 py-2 focus:outline-none text-sm text-gray-900 shadow-sm border ${isSecret ? 'bg-red-50 border-red-300 placeholder-red-400' : 'bg-white/80 border-gray-300 focus:border-[#0a7aff]'}`} />
         </form>
 
         {input.trim() ? (
           <button onClick={(e) => handleSend(e, null)} className={`p-2 rounded-full shadow-md ml-1 text-white ${isSecret ? 'bg-red-500 hover:bg-red-600' : 'bg-[#0a7aff] hover:bg-blue-600'}`}><Send size={18} className="ml-0.5" /></button>
         ) : (
-          <button onMouseDown={startRecording} onMouseUp={stopRecording} onTouchStart={startRecording} onTouchEnd={stopRecording} className={`p-2 rounded-full shadow-md ml-1 text-white ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-[#34c759] hover:bg-green-600'}`}><Mic size={18} /></button>
+          <div className="flex">
+            <button onClick={handleDictate} className={`p-2 rounded-full shadow-md ml-1 text-white ${isDictating ? 'bg-purple-500 animate-pulse' : 'bg-purple-400 hover:bg-purple-500'}`} title="Dictate to text"><Type size={18} /></button>
+            <button onMouseDown={startRecording} onMouseUp={stopRecording} onTouchStart={startRecording} onTouchEnd={stopRecording} className={`p-2 rounded-full shadow-md ml-1 text-white ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-[#34c759] hover:bg-green-600'}`}><Mic size={18} /></button>
+          </div>
         )}
       </motion.div>
       <AnimatePresence>

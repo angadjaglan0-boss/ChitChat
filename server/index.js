@@ -341,3 +341,21 @@ io.on('connection', (socket) => {
     } catch(err) { console.error(err); }
   });
 });
+
+// AI Group Summaries
+app.get('/api/summarize/:groupId', async (req, res) => {
+  try {
+    const messages = await query('SELECT u.username, m.content FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.receiver_id = ? ORDER BY m.created_at DESC LIMIT 50', [req.params.groupId]);
+    const chatLog = messages.reverse().map(m => `${m.username}: ${m.content}`).join('\n');
+    
+    if (process.env.GEMINI_API_KEY) {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `Summarize this chat in 3 short bullet points:\n${chatLog}` }] }] })
+      });
+      const data = await resp.json();
+      return res.json({ summary: data.candidates[0].content.parts[0].text });
+    }
+    res.json({ summary: "• Angad shared some code\n• Team agreed on pizza\n• Hackathon deadline is approaching!\n(Add GEMINI_API_KEY to Render for real summaries)" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});

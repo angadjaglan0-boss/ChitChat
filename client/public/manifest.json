@@ -1,0 +1,15 @@
+{
+  "name": "ChitChat",
+  "short_name": "ChitChat",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0a7aff",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/micah/svg?seed=ChitChat",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
