@@ -105,7 +105,7 @@ const useStore = create((set, get) => ({
     }
   },
 
-  sendMessage: (content) => {
+  sendMessage: (content, type = 'text') => {
     const { socket, activeChat } = get();
     if (!socket || !activeChat) return;
     
@@ -113,13 +113,13 @@ const useStore = create((set, get) => ({
       socket.emit('sendMessage', {
         groupId: activeChat.id,
         content,
-        type: 'text'
+        type
       });
     } else {
       socket.emit('sendMessage', {
         receiverId: activeChat.id,
         content,
-        type: 'text'
+        type
       });
     }
   }

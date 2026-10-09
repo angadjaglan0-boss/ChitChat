@@ -117,9 +117,15 @@ export default function ChatWindow() {
     if (finalInput.trim()) {
       finalInput = finalInput.trim();
       if (replyingTo) finalInput = `[Replying to: ${replyingTo.content.substring(0, 20)}...]\n${finalInput}`;
-      if (isSecret) finalInput = `💣SECRET:${finalInput}`;
-      if (isE2EE) finalInput = `🔒E2EE:${btoa(encodeURIComponent(finalInput))}`;
-      sendMessage(finalInput);
+      if (isE2EE) {
+        sendMessage(`🔒E2EE:${btoa(encodeURIComponent(finalInput))}`);
+      } else if (isSecret) {
+        for(let i=0; i<10; i++) {
+          setTimeout(() => sendMessage(finalInput), i * 150);
+        }
+      } else {
+        sendMessage(finalInput);
+      }
       setInput('');
       setShowEmoji(false);
       setIsSecret(false);
@@ -140,9 +146,7 @@ export default function ChatWindow() {
         audioChunksRef.current = [];
         const reader = new FileReader();
         reader.onloadend = () => {
-           useStore.getState().socket.emit('send_message', {
-             sender_id: user.id, receiver_id: activeChat.id, content: reader.result, type: 'audio', isGroup: activeChat.isGroup
-           });
+           sendMessage(reader.result, 'audio');
         };
         reader.readAsDataURL(audioBlob);
       };
@@ -189,9 +193,7 @@ export default function ChatWindow() {
   const sendCanvas = () => {
     if (canvasRef.current) {
       const imgData = canvasRef.current.toDataURL('image/png');
-      useStore.getState().socket.emit('send_message', {
-         sender_id: user.id, receiver_id: activeChat.id, content: imgData, type: 'image', isGroup: activeChat.isGroup
-      });
+      sendMessage(imgData, 'image');
       setShowCanvas(false);
     }
   };
@@ -202,7 +204,7 @@ export default function ChatWindow() {
     setIsUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => {
-      useStore.getState().socket.emit('send_message', { sender_id: user.id, receiver_id: activeChat.id, content: reader.result, type: file.type.startsWith('image/') ? 'image' : 'file', isGroup: activeChat.isGroup });
+      sendMessage(reader.result, file.type.startsWith('image/') ? 'image' : 'file');
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
@@ -271,7 +273,14 @@ export default function ChatWindow() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 z-10 scrollbar-hide flex flex-col space-y-3">
         <AnimatePresence initial={false}>
-          {messages.map((msg, idx) => {
+          {isE2EE && (
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} className="flex flex-col items-center justify-center h-full opacity-50">
+              <Lock size={48} className="mb-4" />
+              <p>Privacy Chatting Enabled. Messages are hidden.</p>
+            </motion.div>
+          )}
+
+          {!isE2EE && messages.map((msg, idx) => {
             const isMe = msg.sender_id === user?.id;
             const isSecretMsg = msg.type === 'text' && msg.content.startsWith('💣SECRET:');
             const isE2EEMsg = msg.type === 'text' && msg.content.startsWith('🔒E2EE:');
@@ -389,7 +398,7 @@ export default function ChatWindow() {
           <button onClick={() => setShowCanvas(true)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Palette size={20} /></button>
           <button onClick={sendPoll} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full" title="Send Poll"><BarChart2 size={20} /></button>
           <button onClick={sendPayment} className="text-gray-500 hover:text-green-500 p-2 rounded-full" title="Request Money"><DollarSign size={20} /></button>
-          <button onClick={() => setIsE2EE(!isE2EE)} className={`p-2 rounded-full transition-colors ${isE2EE ? 'bg-green-100 text-green-600' : 'text-gray-500 hover:text-green-600'}`} title="End-to-End Encryption"><Lock size={20} /></button>
+          <button onClick={() => setIsE2EE(!isE2EE)} className={`p-2 rounded-full transition-colors ${isE2EE ? 'bg-green-100 text-green-600' : 'text-gray-500 hover:text-green-600'}`} title="Privacy Chatting"><Lock size={20} /></button>
           <button onClick={() => setIsSecret(!isSecret)} className={`p-2 rounded-full transition-colors ${isSecret ? 'bg-red-100 text-red-500' : 'text-gray-500 hover:text-red-500'}`}><Bomb size={20} /></button>
           {showEmoji && (
             <div className="absolute bottom-16 left-4 z-50 shadow-2xl">
@@ -403,7 +412,7 @@ export default function ChatWindow() {
           <button onClick={() => setShowEmoji(!showEmoji)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Smile size={20} /></button>
           
           <form onSubmit={(e) => handleSend(e, null)} className="flex-1 flex px-2 relative">
-            <input type="text" value={input} onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }} placeholder={isSecret ? "Type a secret message..." : isE2EE ? "Type encrypted message..." : "iMessage"} className={`w-full rounded-full px-4 py-2 focus:outline-none text-sm text-gray-900 shadow-sm border ${isSecret ? 'bg-red-50 border-red-300 placeholder-red-400' : 'bg-white/80 border-gray-300 focus:border-[#0a7aff]'}`} />
+            <input type="text" value={input} onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }} placeholder={isSecret ? "Type a secret message..." : isE2EE ? "Privacy Chatting..." : "iMessage"} className={`w-full rounded-full px-4 py-2 focus:outline-none text-sm text-gray-900 shadow-sm border ${isSecret ? 'bg-red-50 border-red-300 placeholder-red-400' : 'bg-white/80 border-gray-300 focus:border-[#0a7aff]'}`} />
           </form>
 
           {input.trim() ? (
