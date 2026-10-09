@@ -18,8 +18,8 @@ export default function Sidebar() {
       {/* Header */}
       <div className="h-16 bg-white/50 backdrop-blur-md flex items-center justify-between px-4 py-2 border-b">
         <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
+          variants={{ hidden: { opacity: 0, x: -50, scale: 0.9 }, visible: { opacity: 1, x: 0, scale: 1, transition: { type: 'spring', stiffness: 400, damping: 20 } } }}
+          
           className="flex items-center gap-3"
         >
           <img src={user?.avatar} alt="avatar" className="w-10 h-10 rounded-full border border-gray-300" />
@@ -86,8 +86,8 @@ export default function Sidebar() {
             filteredUsers.map(contact => (
               <motion.div
                 layout
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+                variants={{ hidden: { opacity: 0, x: -50, scale: 0.9 }, visible: { opacity: 1, x: 0, scale: 1, transition: { type: 'spring', stiffness: 400, damping: 20 } } }}
+                
                 exit={{ opacity: 0, scale: 0.9 }}
                 whileHover={{ backgroundColor: '#f9fafb', scale: 0.98 }}
                 whileTap={{ scale: 0.95 }}

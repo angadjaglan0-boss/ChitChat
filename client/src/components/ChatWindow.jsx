@@ -285,7 +285,7 @@ export default function ChatWindow() {
             const sentiment = msg.type === 'text' && !isSecretMsg && !isE2EEMsg ? getSentimentEmoji(cleanContent) : null;
 
             return (
-              <motion.div layout initial={{ opacity: 0, scale: 0.8, x: isMe ? 50 : -50, originX: isMe ? 1 : 0 }} animate={{ opacity: 1, scale: 1, x: 0 }} key={msg.id || idx} className={`group flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <motion.div layout initial={{ opacity: 0, scale: 0.8, x: isMe ? 50 : -50, originX: isMe ? 1 : 0 }} animate={{ opacity: 1, scale: 1, x: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 25 }} key={msg.id || idx} className={`group flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {isMe && (
                   <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                     <button onClick={() => handleTranslate(msg.id, cleanContent)} className="p-1 text-gray-400 hover:text-blue-500"><Globe size={16} /></button>
