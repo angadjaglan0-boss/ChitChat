@@ -389,6 +389,12 @@ export default function ChatWindow() {
           <button onClick={sendPayment} className="text-gray-500 hover:text-green-500 p-2 rounded-full" title="Request Money"><DollarSign size={20} /></button>
           <button onClick={() => setIsE2EE(!isE2EE)} className={`p-2 rounded-full transition-colors ${isE2EE ? 'bg-green-100 text-green-600' : 'text-gray-500 hover:text-green-600'}`} title="End-to-End Encryption"><Lock size={20} /></button>
           <button onClick={() => setIsSecret(!isSecret)} className={`p-2 rounded-full transition-colors ${isSecret ? 'bg-red-100 text-red-500' : 'text-gray-500 hover:text-red-500'}`}><Bomb size={20} /></button>
+          {showEmoji && (
+            <div className="absolute bottom-16 left-4 z-50 shadow-2xl">
+              <EmojiPicker onEmojiClick={(e) => setInput(p => p + e.emoji)} theme="light" />
+            </div>
+          )}
+
           <button onClick={() => setShowEmoji(!showEmoji)} className="text-gray-500 hover:text-[#0a7aff] p-2 rounded-full"><Smile size={20} /></button>
           
           <form onSubmit={(e) => handleSend(e, null)} className="flex-1 flex px-2 relative">
@@ -406,7 +412,7 @@ export default function ChatWindow() {
         </div>
       </motion.div>
       <AnimatePresence>
-        {callState && <CallModal caller={activeChat} isIncoming={callState === 'incoming'} onAccept={() => { setCallState('active'); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'answer' }); }} onDecline={() => { setCallState(null); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'end' }); }} onEnd={() => { setCallState(null); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'end' }); }} />}
+        {callState && <CallModal caller={activeChat} isIncoming={callState === 'incoming'} isActive={callState === 'active'} onAccept={() => { setCallState('active'); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'answer' }); }} onDecline={() => { setCallState(null); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'end' }); }} onEnd={() => { setCallState(null); useStore.getState().socket.emit('webrtc_signal', { to: activeChat.id, type: 'end' }); }} />}
       </AnimatePresence>
     </div>
   );
