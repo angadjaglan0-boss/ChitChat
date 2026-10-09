@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Trash2, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone } from 'lucide-react';
+import { ArrowLeft, Send, Trash2, Globe, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone } from 'lucide-react';
 import CallModal from './CallModal';
 import useStore from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -71,6 +71,22 @@ export default function ChatWindow() {
   const handleDeleteMessage = async (msgId) => {
     try {
       await fetch(`${API_URL}/messages/${msgId}`, { method: 'DELETE' });
+    } catch(err) { console.error(err); }
+  };
+
+  const handleTranslate = async (msgId, text) => {
+    if (!text) return;
+    try {
+      const res = await fetch(`${API_URL}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLang: 'hi' }) // Translates to Hindi
+      });
+      const data = await res.json();
+      if (data.translated) {
+        useStore.getState().socket.emit('update_message', { id: msgId, content: data.translated });
+        useStore.getState().set({ messages: useStore.getState().messages.map(m => m.id === msgId ? { ...m, content: data.translated } : m) });
+      }
     } catch(err) { console.error(err); }
   };
 
@@ -214,9 +230,14 @@ export default function ChatWindow() {
                 className={`group flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
                 {isMe && (
-                  <button onClick={() => handleDeleteMessage(msg.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                    <button onClick={() => handleTranslate(msg.id, msg.content)} className="p-1 text-gray-400 hover:text-blue-500">
+                      <Globe size={16} />
+                    </button>
+                    <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 text-gray-400 hover:text-red-500">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
                 <div 
                   className={`max-w-[75%] px-4 py-2 text-[15px] ${
@@ -241,6 +262,11 @@ export default function ChatWindow() {
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
+                {!isMe && (
+                  <button onClick={() => handleTranslate(msg.id, msg.content)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-500 transition-opacity">
+                    <Globe size={16} />
+                  </button>
+                )}
               </motion.div>
             );
           })}

@@ -58,6 +58,10 @@ const useStore = create((set, get) => ({
       console.log('Socket connected');
     });
 
+    socket.on('message_updated', (data) => {
+      set({ messages: get().messages.map(m => m.id === data.id ? { ...m, content: data.content } : m) });
+    });
+
     socket.on('message_deleted', (id) => {
       set({ messages: get().messages.filter(m => m.id != id) });
     });

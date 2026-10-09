@@ -131,21 +131,21 @@ app.get('/api/messages/:userId/:contactId', async (req, res) => {
 });
 
 // Mock AI Logic
-const generateAIResponse = (text) => {
-  const lower = text.toLowerCase();
-  if (lower.includes('hello') || lower.includes('hi')) return "Hello there! I'm ChitChat AI. How can I assist you today?";
-  if (lower.includes('hackathon')) return "Hackathons are awesome! I see you're building a great chat app.";
-  if (lower.includes('help')) return "I can chat with you, react to your emojis, and even see attachments you send me!";
-  if (lower.includes('joke')) return "Why do programmers prefer dark mode? Because light attracts bugs!";
-  const responses = [
-    "That's really interesting! Tell me more.",
-    "I completely agree with you on that.",
-    "Fascinating. How did you come up with that?",
-    "As an AI, I don't have personal opinions, but that sounds cool!",
-    "Wow, mind blown! 🤯",
-    "Hmm, let me think about that... Okay, you're right!"
-  ];
-  return responses[Math.floor(Math.random() * responses.length)];
+const generateAIResponse = async (text) => {
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] })
+      });
+      const data = await resp.json();
+      if (data.candidates && data.candidates[0]) {
+        return data.candidates[0].content.parts[0].text;
+      }
+    } catch(err) { console.error(err); }
+  }
+  return "I am connected! To make me a smart AI, please get a free Gemini API key from https://aistudio.google.com and add it as 'GEMINI_API_KEY' in your Render Environment Variables!";
 };
 
 // -- WebSocket / Real-time Logic --
@@ -205,7 +205,7 @@ io.on('connection', async (socket) => {
         const receiverUser = await get('SELECT username FROM users WHERE id = ?', [receiverId]);
         if (receiverUser && receiverUser.username === 'ChitChat AI') {
           setTimeout(async () => {
-            const aiResponse = generateAIResponse(content);
+            const aiResponse = await generateAIResponse(content);
             const aiResult = await run(
               'INSERT INTO messages (sender_id, receiver_id, content, type) VALUES (?, ?, ?, ?)',
               [receiverId, userId, aiResponse, 'text']
@@ -318,4 +318,26 @@ app.delete('/api/messages/:id', async (req, res) => {
     io.emit('message_deleted', req.params.id);
     res.json({ success: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// AI Bot Integration & Free Translation API
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLang = 'hi' } = req.body; // Default to Hindi
+  try {
+    // Using MyMemory Free Translation API (No API Key Required!)
+    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`);
+    const data = await response.json();
+    res.json({ translated: data.responseData.translatedText });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+io.on('connection', (socket) => {
+  socket.on('update_message', async (data) => {
+    try {
+      await run('UPDATE messages SET content = ? WHERE id = ?', [data.content, data.id]);
+      io.emit('message_updated', data);
+    } catch(err) { console.error(err); }
+  });
 });
