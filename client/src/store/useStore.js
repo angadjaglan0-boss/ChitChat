@@ -67,6 +67,7 @@ const useStore = create((set, get) => ({
     });
 
     socket.on('newMessage', (msg) => {
+      if (msg.sender_id !== get().user?.id) window.playReceiveSound();
       const { activeChat } = get();
       if (activeChat && (msg.sender_id === activeChat.id || msg.receiver_id === activeChat.id)) {
         set(state => ({ messages: [...state.messages, msg] }));
@@ -142,5 +143,23 @@ window.playSendSound = () => {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.2);
+  } catch(e) {}
+};
+
+window.playReceiveSound = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
   } catch(e) {}
 };
