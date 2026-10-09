@@ -297,3 +297,25 @@ app.use(express.static(clientBuildPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
+
+// Typing Indicators & Message Deletion
+io.on('connection', (socket) => {
+  socket.on('typing', (data) => {
+    if (data.isGroup) {
+      socket.to(`group_${data.to}`).emit('typing', { from: socket.userId, to: data.to, isGroup: true });
+    } else {
+      const receiverSocket = userSockets.get(data.to);
+      if (receiverSocket) {
+        io.to(receiverSocket).emit('typing', { from: socket.userId, to: data.to });
+      }
+    }
+  });
+});
+
+app.delete('/api/messages/:id', async (req, res) => {
+  try {
+    await run('DELETE FROM messages WHERE id = ?', [req.params.id]);
+    io.emit('message_deleted', req.params.id);
+    res.json({ success: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});

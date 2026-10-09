@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone } from 'lucide-react';
+import { ArrowLeft, Send, Trash2, Paperclip, Smile, MoreVertical, Search, X, MessageCircle, MapPin, Image as ImageIcon, Phone } from 'lucide-react';
 import CallModal from './CallModal';
 import useStore from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,8 @@ export default function ChatWindow() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [showGifs, setShowGifs] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeout = useRef(null);
   const [callState, setCallState] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -43,9 +45,19 @@ export default function ChatWindow() {
       if (data.type === 'answer') setCallState('active');
       if (data.type === 'end') setCallState(null);
     };
+    const handleTyping = (data) => {
+      const active = useStore.getState().activeChat;
+      if (!active) return;
+      if ((data.isGroup && data.to == active.id) || (!data.isGroup && data.from == active.id)) {
+        setIsTyping(true);
+        clearTimeout(typingTimeout.current);
+        typingTimeout.current = setTimeout(() => setIsTyping(false), 2000);
+      }
+    };
     s.on('webrtc_signal', handleSignal);
-    return () => s.off('webrtc_signal', handleSignal);
-  }, []);
+    s.on('typing', handleTyping);
+    return () => { s.off('webrtc_signal', handleSignal); s.off('typing', handleTyping); };
+  }, [activeChat]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -55,6 +67,12 @@ export default function ChatWindow() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleDeleteMessage = async (msgId) => {
+    try {
+      await fetch(`${API_URL}/messages/${msgId}`, { method: 'DELETE' });
+    } catch(err) { console.error(err); }
+  };
 
   const handleSend = (e) => {
     e?.preventDefault();
@@ -193,8 +211,13 @@ export default function ChatWindow() {
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 key={msg.id || idx}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                className={`group flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
+                {isMe && (
+                  <button onClick={() => handleDeleteMessage(msg.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity">
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <div 
                   className={`max-w-[75%] px-4 py-2 text-[15px] ${
                     isMe ? 'bg-[#0a7aff] text-white rounded-2xl rounded-br-[4px] shadow-sm' : 'bg-[#e9e9eb] text-black rounded-2xl rounded-bl-[4px] shadow-sm'
@@ -321,7 +344,7 @@ export default function ChatWindow() {
             whileFocus={{ scale: 1.01 }}
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); useStore.getState().socket?.emit('typing', { to: activeChat.id, isGroup: activeChat.isGroup }); }}
             placeholder="iMessage"
             className="w-full bg-white/80 rounded-full px-5 py-2 focus:outline-none text-sm text-gray-900 shadow-sm transition-all focus:shadow-md border border-gray-300 focus:border-[#0a7aff]"
           />

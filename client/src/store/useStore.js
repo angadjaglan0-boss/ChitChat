@@ -58,6 +58,10 @@ const useStore = create((set, get) => ({
       console.log('Socket connected');
     });
 
+    socket.on('message_deleted', (id) => {
+      set({ messages: get().messages.filter(m => m.id != id) });
+    });
+
     socket.on('newMessage', (msg) => {
       const { activeChat } = get();
       if (activeChat && (msg.sender_id === activeChat.id || msg.receiver_id === activeChat.id)) {
