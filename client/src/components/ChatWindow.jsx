@@ -210,15 +210,19 @@ export default function ChatWindow() {
 
   if (!activeChat) {
     return (
-      <div className="hidden md:flex flex-col items-center justify-center flex-1 bg-transparent border-l border-white/20 overflow-hidden relative">
-        <div className="text-center">
-          <MessageCircle size={80} className="text-white/50 mx-auto mb-6" />
-          <h2 className="text-3xl font-light text-white mb-2">ChitChat for Web</h2>
-          <p className="text-white/60 font-medium">Select a friend to start chatting</p>
+      <div className="hidden md:flex flex-col items-center justify-center flex-1 bg-black/40 backdrop-blur-xl border-l border-white/10 overflow-hidden relative">
+        <div className="absolute inset-0 z-0 opacity-50">
+          <spline-viewer url="https://prod.spline.design/6Wq1Q7YGyM-iab9i/scene.splinecode"></spline-viewer>
+        </div>
+        <div className="text-center z-10 pointer-events-none drop-shadow-2xl">
+          <MessageCircle size={100} className="text-white/80 mx-auto mb-6" />
+          <h2 className="text-4xl font-extrabold text-white mb-2 tracking-tight">ChitChat Pro</h2>
+          <p className="text-white/60 font-medium text-lg">Select a conversation to begin</p>
         </div>
       </div>
     );
   }
+
 
   const smartReplies = getSmartReplies(messages, user);
 
